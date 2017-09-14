@@ -425,6 +425,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				INFOPLIST_FILE = SZH_CameraDemo/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 8.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = "BibaoBaseUsing.SZH-CameraDemo";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -436,6 +437,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				INFOPLIST_FILE = SZH_CameraDemo/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 8.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = "BibaoBaseUsing.SZH-CameraDemo";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -507,6 +509,7 @@
 				A6689CE41F6A55080024BFBE /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		A6689CE51F6A55080024BFBE /* Build configuration list for PBXNativeTarget "SZH_CameraDemoTests" */ = {
 			isa = XCConfigurationList;
@@ -515,6 +518,7 @@
 				A6689CE71F6A55080024BFBE /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		A6689CE81F6A55080024BFBE /* Build configuration list for PBXNativeTarget "SZH_CameraDemoUITests" */ = {
 			isa = XCConfigurationList;
@@ -523,6 +527,7 @@
 				A6689CEA1F6A55080024BFBE /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
