@@ -34,12 +34,16 @@
     
     
     BOOL                        _orShooting;
+    
+    BOOL					   _readyToRecordVideo;
+    BOOL					   _readyToRecordAudio;
     //录制的文件
     NSURL				        *_movieURL;
     AVAssetWriter             *_assetWriter;
     AVAssetWriterInput	      *_assetAudioInput;
     AVAssetWriterInput        *_assetVideoInput;
     
+    //多线程
     dispatch_queue_t           _movieWritingQueue;
     
 }
@@ -193,8 +197,8 @@
 //摄像
 - (void)szh_shootingPictures {
     
-    _orShooting = !_orShooting;
-    if (_orShooting) {
+    
+    if (!_orShooting) {
         [self szh_startShooting];
     } else {
         [self szh_stopShooting];
@@ -205,16 +209,60 @@
 //开始录制
 - (void)szh_startShooting {
     
+    // 删除原来的视频文件
+    [self removeFile:_movieURL];
+    dispatch_async(_movieWritingQueue, ^{
+        if (!_assetWriter) {
+            NSError *error;
+            _assetWriter = [[AVAssetWriter alloc] initWithURL:_movieURL fileType:AVFileTypeQuickTimeMovie error:&error];
+        }
+        _orShooting = YES;
+    });
  
     
 }
 
 //停止录制
 - (void)szh_stopShooting {
+
+    _orShooting = NO;
     
-    
-  
-    
+    if (![self inputsReadyToRecord]) {
+     
+        NSLog(@"停止录制");
+        return ;
+    }
+   
+    dispatch_async(_movieWritingQueue, ^{
+        [_assetWriter finishWritingWithCompletionHandler:^(){
+            BOOL isSave = NO;// 是否生成完整的视频
+            switch (_assetWriter.status)
+            {
+                case AVAssetWriterStatusCompleted:
+                {
+                    _readyToRecordVideo = NO;
+                    _readyToRecordAudio = NO;
+                    _assetWriter = nil;
+                    isSave = YES;
+                    break;
+                }
+                case AVAssetWriterStatusFailed:
+                {
+                    isSave = NO;
+                   ;
+                    break;
+                }
+                default:
+                    break;
+            }
+            if (isSave) {
+                dispatch_sync(dispatch_get_main_queue(), ^{
+                    [self szh_saveMovieToCameraRoll];
+                });
+            }
+        }];
+    });
+
     
 }
 
@@ -233,6 +281,13 @@
                    
                 });
               
+                
+                if (!success) {
+                    NSLog(@"失败！");
+                } else {
+                     NSLog(@"成功！");
+                }
+                
             }];
         }];
     }
@@ -243,6 +298,11 @@
                
             });
             
+            if (!assetURL) {
+                NSLog(@"失败！");
+            } else {
+                NSLog(@"成功！");
+            }
         }];
     }
 }
@@ -253,7 +313,37 @@
 {
     
     if (_orShooting) {
-        NSLog(@"录制中。。。。。");
+        
+        
+        
+        CFRetain(sampleBuffer);
+        dispatch_async(_movieWritingQueue, ^{
+            if (_assetWriter)
+            {
+                if (connection == _videoConnection)
+                {
+                    if (!_readyToRecordVideo){
+                        _readyToRecordVideo = [self setupAssetWriterVideoInput:CMSampleBufferGetFormatDescription(sampleBuffer)];
+                    }
+                    
+                    if ([self inputsReadyToRecord]){
+                        [self writeSampleBuffer:sampleBuffer ofType:AVMediaTypeVideo];
+                    }
+                }
+                else if (connection == _audioConnection){
+                    
+                    NSLog(@"录制中。。。。 %@",connection);
+                    if (!_readyToRecordAudio){
+                        _readyToRecordAudio = [self setupAssetWriterAudioInput:CMSampleBufferGetFormatDescription(sampleBuffer)];
+                    }
+                    
+                    if ([self inputsReadyToRecord]){
+                        [self writeSampleBuffer:sampleBuffer ofType:AVMediaTypeAudio];
+                    }
+                }
+            }
+            CFRelease(sampleBuffer);
+        });
     }
 
 }
@@ -263,7 +353,36 @@
 - (void)writeSampleBuffer:(CMSampleBufferRef)sampleBuffer ofType:(NSString *)mediaType
 {
     
+    if (_assetWriter.status == AVAssetWriterStatusUnknown)
+    {
+        if ([_assetWriter startWriting]){
+            [_assetWriter startSessionAtSourceTime:CMSampleBufferGetPresentationTimeStamp(sampleBuffer)];
+        }
+        else{
+            
+        }
+    }
     
+    if (_assetWriter.status == AVAssetWriterStatusWriting)
+    {
+        if (mediaType == AVMediaTypeVideo)
+        {
+            if (!_assetVideoInput.readyForMoreMediaData){
+                return;
+            }
+            if (![_assetVideoInput appendSampleBuffer:sampleBuffer]){
+               
+            }
+        }
+        else if (mediaType == AVMediaTypeAudio){
+            if (!_assetAudioInput.readyForMoreMediaData){
+                return;
+            }
+            if (![_assetAudioInput appendSampleBuffer:sampleBuffer]){
+               
+            }
+        }
+    }
 
 }
 
@@ -271,19 +390,128 @@
 // 配置音频源数据写入
 - (BOOL)setupAssetWriterAudioInput:(CMFormatDescriptionRef)currentFormatDescription
 {
+    size_t aclSize = 0;
+    const AudioStreamBasicDescription *currentASBD = CMAudioFormatDescriptionGetStreamBasicDescription(currentFormatDescription);
+    const AudioChannelLayout *currentChannelLayout = CMAudioFormatDescriptionGetChannelLayout(currentFormatDescription, &aclSize);
     
+    NSData *currentChannelLayoutData = nil;
+    if (currentChannelLayout && aclSize > 0 ){
+        currentChannelLayoutData = [NSData dataWithBytes:currentChannelLayout length:aclSize];
+    }
+    else{
+        currentChannelLayoutData = [NSData data];
+    }
+    NSDictionary *audioCompressionSettings = @{AVFormatIDKey:[NSNumber numberWithInteger:kAudioFormatMPEG4AAC],
+                                               AVSampleRateKey:[NSNumber numberWithFloat:currentASBD->mSampleRate],
+                                               AVEncoderBitRatePerChannelKey:[NSNumber numberWithInt:64000],
+                                               AVNumberOfChannelsKey:[NSNumber numberWithInteger:currentASBD->mChannelsPerFrame],
+                                               AVChannelLayoutKey:currentChannelLayoutData};
+    
+    if ([_assetWriter canApplyOutputSettings:audioCompressionSettings forMediaType:AVMediaTypeAudio])
+    {
+        _assetAudioInput = [AVAssetWriterInput assetWriterInputWithMediaType:AVMediaTypeAudio outputSettings:audioCompressionSettings];
+        _assetAudioInput.expectsMediaDataInRealTime = YES;
+        if ([_assetWriter canAddInput:_assetAudioInput]){
+            [_assetWriter addInput:_assetAudioInput];
+        }
+        else{
+            
+            return NO;
+        }
+    }
+    else{
+        
+        return NO;
+    }
     return YES;
 }
 
 // 配置视频源数据写入
 - (BOOL)setupAssetWriterVideoInput:(CMFormatDescriptionRef)currentFormatDescription
 {
+    CGFloat bitsPerPixel;
+    CMVideoDimensions dimensions = CMVideoFormatDescriptionGetDimensions(currentFormatDescription);
+    NSUInteger numPixels = dimensions.width * dimensions.height;
+    NSUInteger bitsPerSecond;
     
+    if (numPixels < (640 * 480)){
+        bitsPerPixel = 4.05;
+    }
+    else{
+        bitsPerPixel = 11.4;
+    }
+    
+    bitsPerSecond = numPixels * bitsPerPixel;
+    NSDictionary *videoCompressionSettings = @{AVVideoCodecKey:AVVideoCodecH264,
+                                               AVVideoWidthKey:[NSNumber numberWithInteger:dimensions.width],
+                                               AVVideoHeightKey:[NSNumber numberWithInteger:dimensions.height],
+                                               AVVideoCompressionPropertiesKey:@{AVVideoAverageBitRateKey:[NSNumber numberWithInteger:bitsPerSecond],
+                                                                                 AVVideoMaxKeyFrameIntervalKey:[NSNumber numberWithInteger:30]}
+                                               };
+    if ([_assetWriter canApplyOutputSettings:videoCompressionSettings forMediaType:AVMediaTypeVideo])
+    {
+        _assetVideoInput = [AVAssetWriterInput assetWriterInputWithMediaType:AVMediaTypeVideo outputSettings:videoCompressionSettings];
+        _assetVideoInput.expectsMediaDataInRealTime = YES;
+        _assetVideoInput.transform = [self transformFromCurrentVideoOrientationToOrientation:AVCaptureVideoOrientationPortrait];
+        if ([_assetWriter canAddInput:_assetVideoInput]){
+            [_assetWriter addInput:_assetVideoInput];
+        }
+        else{
+            
+            return NO;
+        }
+    }
+    else{
+        
+        return NO;
+    }
     return YES;
 }
 
 
+// 旋转视频方向
+- (CGAffineTransform)transformFromCurrentVideoOrientationToOrientation:(AVCaptureVideoOrientation)orientation
+{
+    CGFloat orientationAngleOffset = [self angleOffsetFromPortraitOrientationToOrientation:orientation];
+    CGFloat videoOrientationAngleOffset = [self angleOffsetFromPortraitOrientationToOrientation:AVCaptureVideoOrientationPortrait];
+    CGFloat angleOffset;
+    if ([self activeCamera].position == AVCaptureDevicePositionBack) {
+        angleOffset = orientationAngleOffset - videoOrientationAngleOffset;
+    }
+    else{
+        angleOffset = videoOrientationAngleOffset - orientationAngleOffset + M_PI_2;
+    }
+    CGAffineTransform transform = CGAffineTransformMakeRotation(angleOffset);
+    return transform;
+}
 
+- (CGFloat)angleOffsetFromPortraitOrientationToOrientation:(AVCaptureVideoOrientation)orientation
+{
+    CGFloat angle = 0.0;
+    switch (orientation)
+    {
+        case AVCaptureVideoOrientationPortrait:
+            angle = 0.0;
+            break;
+        case AVCaptureVideoOrientationPortraitUpsideDown:
+            angle = M_PI;
+            break;
+        case AVCaptureVideoOrientationLandscapeRight:
+            angle = -M_PI_2;
+            break;
+        case AVCaptureVideoOrientationLandscapeLeft:
+            angle = M_PI_2;
+            break;
+        default:
+            break;
+    }
+    return angle;
+}
+
+
+- (BOOL)inputsReadyToRecord{
+    return _readyToRecordVideo && _readyToRecordAudio;
+}
 
 // 移除文件
 - (void)removeFile:(NSURL *)fileURL
@@ -454,6 +682,11 @@
 #pragma mark ----------- 开启捕捉会话
 
 - (void)szh_startCaptureSession {
+    
+    if (!_movieWritingQueue) {
+        _movieWritingQueue = dispatch_queue_create("Movie Writing Queue", DISPATCH_QUEUE_SERIAL);
+    }
+    
     if (!_captureSession.isRunning) {
         [_captureSession startRunning];
     }
@@ -494,33 +727,30 @@
 
 - (void)szh_setupCaptureOutput {
     
-    dispatch_queue_t captureQueue = dispatch_queue_create("com.cc.MovieCaptureQueue", DISPATCH_QUEUE_SERIAL);
+     dispatch_queue_t captureQueue = dispatch_queue_create("com.cc.MovieCaptureQueue", DISPATCH_QUEUE_SERIAL);
     
     
-    //视频输出
-    _videoOutput = [[AVCaptureVideoDataOutput alloc]init];
-    [_videoOutput setAlwaysDiscardsLateVideoFrames:YES];
-    [_videoOutput setVideoSettings:@{(id)kCVPixelBufferPixelFormatTypeKey : [NSNumber numberWithInt:kCVPixelFormatType_32BGRA]}];
-    [_videoOutput setSampleBufferDelegate:self queue:captureQueue];
-    if ([_captureSession canAddOutput:_videoOutput]) {
-        [_captureSession addOutput:_videoOutput];
+    // 视频输出
+    AVCaptureVideoDataOutput *videoOut = [[AVCaptureVideoDataOutput alloc] init];
+    [videoOut setAlwaysDiscardsLateVideoFrames:YES];
+    [videoOut setVideoSettings:@{(id)kCVPixelBufferPixelFormatTypeKey : [NSNumber numberWithInt:kCVPixelFormatType_32BGRA]}];
+    [videoOut setSampleBufferDelegate:self queue:captureQueue];
+    if ([_captureSession canAddOutput:videoOut]){
+        [_captureSession addOutput:videoOut];
+        _videoOutput = videoOut;
     }
-    
-    //视频链接
-    _videoConnection = [_videoOutput connectionWithMediaType:AVMediaTypeVideo];
+    _videoConnection = [videoOut connectionWithMediaType:AVMediaTypeVideo];
     _videoConnection.videoOrientation = AVCaptureVideoOrientationPortrait;
     
     
     
-    //音频输出
-    _audioOutput = [[AVCaptureAudioDataOutput alloc]init];
-    [_audioOutput setSampleBufferDelegate:self queue:captureQueue];
-    if ([_captureSession canAddOutput:_audioOutput]) {
-        [_captureSession addOutput:_audioOutput];
+    // 音频输出
+    AVCaptureAudioDataOutput *audioOut = [[AVCaptureAudioDataOutput alloc] init];
+    [audioOut setSampleBufferDelegate:self queue:captureQueue];
+    if ([_captureSession canAddOutput:audioOut]){
+        [_captureSession addOutput:audioOut];
     }
-    //音频链接
-    _audioConnection = [_audioOutput connectionWithMediaType:AVMediaTypeAudio];
-    
+    _audioConnection = [audioOut connectionWithMediaType:AVMediaTypeAudio];
     
     
     
