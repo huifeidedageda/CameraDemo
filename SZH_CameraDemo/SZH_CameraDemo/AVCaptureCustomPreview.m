@@ -9,6 +9,7 @@
 #import "AVCaptureCustomPreview.h"
 #import <Masonry.h>
 #import "AVCaptureCustomToolBar.h"
+#import <GPUImage.h>
 @interface AVCaptureCustomPreview ()<AVCaptureCustomToolBarDelegate>
 //辅助功能
 @property (nonatomic,strong) UIButton  *toolsButton;
@@ -89,6 +90,8 @@
 #pragma mark ------------- 创建UI
 
 - (void)szh_setupUI {
+    
+    
     [self addSubview:self.focusView];
     [self addSubview:self.toolsButton];
     [self addSubview:self.changeDerection];

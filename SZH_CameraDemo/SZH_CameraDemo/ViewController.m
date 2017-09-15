@@ -5,10 +5,14 @@
 //  Created by 智衡宋 on 2017/9/14.
 //  Copyright © 2017年 智衡宋. All rights reserved.
 //
-
+#define ISIOS9 __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_9_0
 #import "ViewController.h"
 #import <AVFoundation/AVFoundation.h>
 #import "AVCaptureCustomPreview.h"
+#import <GPUImage.h>
+#import <AssetsLibrary/AssetsLibrary.h>
+#import <Photos/Photos.h>
+#import <CoreMedia/CMMetadata.h>
 @interface ViewController ()<AVCaptureAudioDataOutputSampleBufferDelegate,AVCaptureVideoDataOutputSampleBufferDelegate,AVCapturePhotoCaptureDelegate,AVCaptureCustomPreviewDelegate>
 
 @end
@@ -30,8 +34,13 @@
     
     
     BOOL                        _orShooting;
-    BOOL                        _orDrection;
+    //录制的文件
+    NSURL				        *_movieURL;
+    AVAssetWriter             *_assetWriter;
+    AVAssetWriterInput	      *_assetAudioInput;
+    AVAssetWriterInput        *_assetVideoInput;
     
+    dispatch_queue_t           _movieWritingQueue;
     
 }
 
@@ -51,12 +60,21 @@
 
 - (void)szh_createCamera {
     
+    
+    [self szh_setupSomeInit];
     [self szh_setCaptureSession];
     [self szh_setupCaptureInput];
     [self szh_setupCaptureOutput];
     [self szh_startCaptureSession];
+    
 }
 
+#pragma mark ----------- 初始化一些设置
+
+- (void)szh_setupSomeInit {
+    
+    _movieURL = [NSURL fileURLWithPath:[NSString stringWithFormat:@"%@%@", NSTemporaryDirectory(), @"movie.mov"]];
+}
 
 #pragma mark ----------- 创建捕捉预览
 
@@ -69,7 +87,6 @@
 }
 
 #pragma mark ----------- 预览照相代理
-
 
 - (void)szh_changeFunctions:(NSInteger)number {
     
@@ -103,9 +120,9 @@
             _videoInput =nil;
             
             if (position ==AVCaptureDevicePositionFront)
-                newCamera = [self cameraWithPosition:AVCaptureDevicePositionBack];
+                newCamera = [self szh_cameraWithPosition:AVCaptureDevicePositionBack];
             else
-                newCamera = [self cameraWithPosition:AVCaptureDevicePositionFront];
+                newCamera = [self szh_cameraWithPosition:AVCaptureDevicePositionFront];
             _videoInput = [AVCaptureDeviceInput deviceInputWithDevice:newCamera error:nil];
             
             // beginConfiguration ensures that pending changes are not applied immediately
@@ -121,7 +138,7 @@
     }
 }
 
-- (AVCaptureDevice *)cameraWithPosition:(AVCaptureDevicePosition)position
+- (AVCaptureDevice *)szh_cameraWithPosition:(AVCaptureDevicePosition)position
 {
     NSArray *devices = [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo];
     for (AVCaptureDevice *device in devices )
@@ -130,19 +147,163 @@
     return nil;
 }
 
-
-
 //拍照
 - (void)szh_takePhotos {
+    AVCaptureConnection *connection = [_imageOutput connectionWithMediaType:AVMediaTypeVideo];
+    
+    if (connection.isVideoOrientationSupported) {
+        connection.videoOrientation = [self currentVideoOrientation];
+    }
+    
+    [_imageOutput captureStillImageAsynchronouslyFromConnection:connection completionHandler:^(CMSampleBufferRef imageDataSampleBuffer, NSError *error) {
+        
+        if (imageDataSampleBuffer) {
+            
+            NSData *imageData = [AVCaptureStillImageOutput jpegStillImageNSDataRepresentation:imageDataSampleBuffer];
+            UIImage *image = [[UIImage alloc]initWithData:imageData];
+            
+            NSLog(@"是否存入相册 -------- %@",image);
+        }
+        
+        
+    }];
     
 }
 
+// 调整设备取向
+- (AVCaptureVideoOrientation)currentVideoOrientation{
+    AVCaptureVideoOrientation orientation;
+    switch (AVCaptureVideoOrientationPortrait) {
+        case UIDeviceOrientationPortrait:
+            orientation = AVCaptureVideoOrientationPortrait;
+            break;
+        case UIDeviceOrientationLandscapeRight:
+            orientation = AVCaptureVideoOrientationLandscapeLeft;
+            break;
+        case UIDeviceOrientationPortraitUpsideDown:
+            orientation = AVCaptureVideoOrientationPortraitUpsideDown;
+            break;
+        default:
+            orientation = AVCaptureVideoOrientationLandscapeRight;
+            break;
+    }
+    return orientation;
+}
 
 //摄像
 - (void)szh_shootingPictures {
     
+    _orShooting = !_orShooting;
+    if (_orShooting) {
+        [self szh_startShooting];
+    } else {
+        [self szh_stopShooting];
+    }
+
+}
+
+//开始录制
+- (void)szh_startShooting {
+    
+ 
     
 }
+
+//停止录制
+- (void)szh_stopShooting {
+    
+    
+  
+    
+    
+}
+
+// 保存视频
+- (void)szh_saveMovieToCameraRoll
+{
+   
+    if (ISIOS9) {
+        [PHPhotoLibrary requestAuthorization:^( PHAuthorizationStatus status ) {
+            if (status != PHAuthorizationStatusAuthorized) return ;
+            [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
+                PHAssetCreationRequest *videoRequest = [PHAssetCreationRequest creationRequestForAsset];
+                [videoRequest addResourceWithType:PHAssetResourceTypeVideo fileURL:_movieURL options:nil];
+            } completionHandler:^( BOOL success, NSError * _Nullable error ) {
+                dispatch_sync(dispatch_get_main_queue(), ^{
+                   
+                });
+              
+            }];
+        }];
+    }
+    else{
+        ALAssetsLibrary *lab = [[ALAssetsLibrary alloc]init];
+        [lab writeVideoAtPathToSavedPhotosAlbum:_movieURL completionBlock:^(NSURL *assetURL, NSError *error) {
+            dispatch_sync(dispatch_get_main_queue(), ^{
+               
+            });
+            
+        }];
+    }
+}
+
+
+#pragma mark - AVCaptureVideoDataOutputSampleBufferDelegate
+- (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer fromConnection:(AVCaptureConnection *)connection
+{
+    
+    if (_orShooting) {
+        NSLog(@"录制中。。。。。");
+    }
+
+}
+
+
+
+- (void)writeSampleBuffer:(CMSampleBufferRef)sampleBuffer ofType:(NSString *)mediaType
+{
+    
+    
+
+}
+
+#pragma mark - configer
+// 配置音频源数据写入
+- (BOOL)setupAssetWriterAudioInput:(CMFormatDescriptionRef)currentFormatDescription
+{
+    
+    return YES;
+}
+
+// 配置视频源数据写入
+- (BOOL)setupAssetWriterVideoInput:(CMFormatDescriptionRef)currentFormatDescription
+{
+    
+    return YES;
+}
+
+
+
+
+// 移除文件
+- (void)removeFile:(NSURL *)fileURL
+{
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSString *filePath = fileURL.path;
+    if ([fileManager fileExistsAtPath:filePath])
+    {
+        NSError *error;
+        BOOL success = [fileManager removeItemAtPath:filePath error:&error];
+        if (!success){
+//            [self showError:error];
+        }
+        else{
+            NSLog(@"删除视频文件成功");
+        }
+    }
+}
+
+
 
 #pragma mark ----------- 辅助功能代理
 
@@ -234,7 +395,6 @@
     return nil;
 }
 
-
 //闪光灯
 - (void)szh_openFlashlight {
     
@@ -282,7 +442,6 @@
     }
     return error;
 }
-
 
 #pragma mark ----------- 创建捕捉会话
 
@@ -374,9 +533,7 @@
     
 }
 
-#pragma mark ----------- 
-
-
+#pragma mark -----------  内存警告
 
 - (void)didReceiveMemoryWarning {
     [super didReceiveMemoryWarning];
