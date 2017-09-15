@@ -8,7 +8,18 @@
 
 #import <UIKit/UIKit.h>
 #import <AVFoundation/AVFoundation.h>
+
+@protocol AVCaptureCustomPreviewDelegate <NSObject>
+
+- (void)szh_changeFunctions:(NSInteger)number;
+
+- (void)szh_changeToolsFunctions:(NSInteger)number;
+
+@end
+
 @interface AVCaptureCustomPreview : UIView
+
+@property (nonatomic,weak)id<AVCaptureCustomPreviewDelegate>delegate;
 
 - (instancetype)initWithFrame:(CGRect)frame AVCaptureSession:(AVCaptureSession *)session;
 
