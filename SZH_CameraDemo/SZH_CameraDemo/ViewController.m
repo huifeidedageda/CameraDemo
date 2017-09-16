@@ -9,11 +9,10 @@
 #import "ViewController.h"
 #import <AVFoundation/AVFoundation.h>
 #import "AVCaptureCustomPreview.h"
-#import <GPUImage.h>
 #import <AssetsLibrary/AssetsLibrary.h>
 #import <Photos/Photos.h>
 #import <CoreMedia/CMMetadata.h>
-@interface ViewController ()<AVCaptureAudioDataOutputSampleBufferDelegate,AVCaptureVideoDataOutputSampleBufferDelegate,AVCapturePhotoCaptureDelegate,AVCaptureCustomPreviewDelegate>
+@interface ViewController ()<AVCaptureVideoDataOutputSampleBufferDelegate,AVCaptureAudioDataOutputSampleBufferDelegate,AVCaptureCustomPreviewDelegate>
 
 @end
 
@@ -69,6 +68,7 @@
     [self szh_setCaptureSession];
     [self szh_setupCaptureInput];
     [self szh_setupCaptureOutput];
+    [self szh_setCopturePreviewLayer:_captureSession];
     [self szh_startCaptureSession];
     
 }
@@ -197,7 +197,6 @@
 //摄像
 - (void)szh_shootingPictures {
     
-    
     if (!_orShooting) {
         [self szh_startShooting];
     } else {
@@ -322,6 +321,7 @@
             {
                 if (connection == _videoConnection)
                 {
+                    NSLog(@"录制中1。。。。 %@",connection);
                     if (!_readyToRecordVideo){
                         _readyToRecordVideo = [self setupAssetWriterVideoInput:CMSampleBufferGetFormatDescription(sampleBuffer)];
                     }
@@ -332,7 +332,7 @@
                 }
                 else if (connection == _audioConnection){
                     
-                    NSLog(@"录制中。。。。 %@",connection);
+                    NSLog(@"录制中2。。。。 %@",connection);
                     if (!_readyToRecordAudio){
                         _readyToRecordAudio = [self setupAssetWriterAudioInput:CMSampleBufferGetFormatDescription(sampleBuffer)];
                     }
@@ -675,8 +675,10 @@
 
 - (void)szh_setCaptureSession {
     _captureSession = [[AVCaptureSession alloc]init];
-    [_captureSession setSessionPreset:AVCaptureSessionPresetPhoto];
-    [self szh_setCopturePreviewLayer:_captureSession];
+    
+    //注意：枚举值必须注意使用的情况 AVCaptureSessionPresetInputPriority 这个，才能同时采集视频和音频，否则就只能采集视频
+    [_captureSession setSessionPreset:AVCaptureSessionPresetInputPriority];
+   
 }
 
 #pragma mark ----------- 开启捕捉会话
@@ -704,8 +706,8 @@
 
 - (void)szh_setupCaptureInput {
     AVCaptureDevice *vedioDevice = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
-    NSError *error1;
-    _videoInput = [AVCaptureDeviceInput deviceInputWithDevice:vedioDevice error:&error1];
+    NSError *error;
+    _videoInput = [AVCaptureDeviceInput deviceInputWithDevice:vedioDevice error:&error];
     if (_videoInput) {
         if ([_captureSession canAddInput:_videoInput]) {
             [_captureSession addInput:_videoInput];
@@ -714,8 +716,8 @@
     
     
     AVCaptureDevice *audioDevice = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeAudio];
-    NSError *error2;
-    _audioInput = [AVCaptureDeviceInput deviceInputWithDevice:audioDevice error:&error2];
+    
+    _audioInput = [AVCaptureDeviceInput deviceInputWithDevice:audioDevice error:&error];
     if (_audioInput) {
         if ([_captureSession canAddInput:_audioInput]) {
             [_captureSession addInput:_audioInput];
@@ -727,8 +729,7 @@
 
 - (void)szh_setupCaptureOutput {
     
-     dispatch_queue_t captureQueue = dispatch_queue_create("com.cc.MovieCaptureQueue", DISPATCH_QUEUE_SERIAL);
-    
+    dispatch_queue_t captureQueue = dispatch_queue_create("com.cc.MovieCaptureQueue", DISPATCH_QUEUE_SERIAL);
     
     // 视频输出
     AVCaptureVideoDataOutput *videoOut = [[AVCaptureVideoDataOutput alloc] init];
@@ -741,24 +742,30 @@
     }
     _videoConnection = [videoOut connectionWithMediaType:AVMediaTypeVideo];
     _videoConnection.videoOrientation = AVCaptureVideoOrientationPortrait;
-    
+//
     
     
     // 音频输出
+    
+    dispatch_queue_t audioQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0);
+    
     AVCaptureAudioDataOutput *audioOut = [[AVCaptureAudioDataOutput alloc] init];
-    [audioOut setSampleBufferDelegate:self queue:captureQueue];
     if ([_captureSession canAddOutput:audioOut]){
         [_captureSession addOutput:audioOut];
+        _audioOutput = audioOut;
     }
+    [audioOut setSampleBufferDelegate:self queue:audioQueue];
     _audioConnection = [audioOut connectionWithMediaType:AVMediaTypeAudio];
     
     
     
-    //图片输出
-    _imageOutput = [[AVCaptureStillImageOutput alloc]init];
-    _imageOutput.outputSettings = @{AVVideoCodecKey:AVVideoCodecJPEG};
-    if ([_captureSession canAddOutput:_imageOutput]) {
-        [_captureSession addOutput:_imageOutput];
+    
+    // 静态图片输出
+    AVCaptureStillImageOutput *imageOutput = [[AVCaptureStillImageOutput alloc] init];
+    imageOutput.outputSettings = @{AVVideoCodecKey:AVVideoCodecJPEG};
+    if ([_captureSession canAddOutput:imageOutput]) {
+        [_captureSession addOutput:imageOutput];
+        _imageOutput = imageOutput;
     }
     
 }
