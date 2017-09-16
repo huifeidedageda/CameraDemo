@@ -15,6 +15,7 @@
 		A6689CC81F6A55080024BFBE /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A6689CC61F6A55080024BFBE /* LaunchScreen.storyboard */; };
 		A6689CD31F6A55080024BFBE /* SZH_CameraDemoTests.m in Sources */ = {isa = PBXBuildFile; fileRef = A6689CD21F6A55080024BFBE /* SZH_CameraDemoTests.m */; };
 		A6689CDE1F6A55080024BFBE /* SZH_CameraDemoUITests.m in Sources */ = {isa = PBXBuildFile; fileRef = A6689CDD1F6A55080024BFBE /* SZH_CameraDemoUITests.m */; };
+		A6691AFC1F6CB37200992419 /* CCglCameraViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = A6691AFB1F6CB37200992419 /* CCglCameraViewController.m */; };
 		A6C31E361F6B5BA000A11A6E /* AVCaptureCustomPreview.m in Sources */ = {isa = PBXBuildFile; fileRef = A6C31E351F6B5BA000A11A6E /* AVCaptureCustomPreview.m */; };
 		A6C31E391F6B7AEB00A11A6E /* AVCaptureCustomToolBar.m in Sources */ = {isa = PBXBuildFile; fileRef = A6C31E381F6B7AEB00A11A6E /* AVCaptureCustomToolBar.m */; };
 		C9CF71F12BCAB5E44F6A77B3 /* libPods-SZH_CameraDemo.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5916ABE7E844B97B422834A6 /* libPods-SZH_CameraDemo.a */; };
@@ -57,6 +58,8 @@
 		A6689CD91F6A55080024BFBE /* SZH_CameraDemoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SZH_CameraDemoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A6689CDD1F6A55080024BFBE /* SZH_CameraDemoUITests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SZH_CameraDemoUITests.m; sourceTree = "<group>"; };
 		A6689CDF1F6A55080024BFBE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A6691AFA1F6CB37200992419 /* CCglCameraViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CCglCameraViewController.h; sourceTree = "<group>"; };
+		A6691AFB1F6CB37200992419 /* CCglCameraViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CCglCameraViewController.m; sourceTree = "<group>"; };
 		A6C31E341F6B5BA000A11A6E /* AVCaptureCustomPreview.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AVCaptureCustomPreview.h; sourceTree = "<group>"; };
 		A6C31E351F6B5BA000A11A6E /* AVCaptureCustomPreview.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AVCaptureCustomPreview.m; sourceTree = "<group>"; };
 		A6C31E371F6B7AEB00A11A6E /* AVCaptureCustomToolBar.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AVCaptureCustomToolBar.h; sourceTree = "<group>"; };
@@ -122,6 +125,8 @@
 				A6C31E351F6B5BA000A11A6E /* AVCaptureCustomPreview.m */,
 				A6C31E371F6B7AEB00A11A6E /* AVCaptureCustomToolBar.h */,
 				A6C31E381F6B7AEB00A11A6E /* AVCaptureCustomToolBar.m */,
+				A6691AFA1F6CB37200992419 /* CCglCameraViewController.h */,
+				A6691AFB1F6CB37200992419 /* CCglCameraViewController.m */,
 				A6689CC11F6A55080024BFBE /* Main.storyboard */,
 				A6689CC41F6A55080024BFBE /* Assets.xcassets */,
 				A6689CC61F6A55080024BFBE /* LaunchScreen.storyboard */,
@@ -359,6 +364,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A6691AFC1F6CB37200992419 /* CCglCameraViewController.m in Sources */,
 				A6689CC01F6A55080024BFBE /* ViewController.m in Sources */,
 				A6689CBD1F6A55080024BFBE /* AppDelegate.m in Sources */,
 				A6689CBA1F6A55080024BFBE /* main.m in Sources */,
